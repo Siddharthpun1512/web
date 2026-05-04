@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: joybox-store
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: 10000
+      - key: STORE_NAME
+        value: JoyBox Gifts & Toys
+      - key: STORE_EMAIL
+        sync: false
+      - key: CONTACT_TO_EMAIL
+        sync: false
+      - key: AUTH_TOKEN_SECRET
+        sync: false
+      - key: OWNER_PASSWORD
+        sync: false
+      - key: OWNER_TOKEN_SECRET
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
