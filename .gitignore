@@ -1,6 +1,0 @@
-backend/node_modules/
-backend/.env
-server/node_modules/
-server/.env
-server/reports.xlsx
-server-detached.log
