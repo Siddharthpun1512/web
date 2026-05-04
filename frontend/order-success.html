@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Success | JoyBox Gifts & Toys</title>
+  <meta name="description" content="JoyBox order confirmation page.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="order-success">
+  <header class="site-header">
+    <div class="container nav-bar">
+      <a class="brand" href="index.html">JoyBox</a>
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-label="Open navigation">
+        <span></span>
+        <span></span>
+      </button>
+      <nav class="nav-links" id="site-nav">
+        <a href="index.html">Home</a>
+        <a href="shop.html">Shop</a>
+        <a href="about.html">About</a>
+        <a href="contact.html">Contact</a>
+        <a href="policies.html">Policies</a>
+        <a class="nav-cart" href="checkout.html">Cart <span data-cart-count>0</span></a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero">
+      <div class="container narrow-copy">
+        <p class="eyebrow">Order Received</p>
+        <h1>Your order has been placed successfully.</h1>
+        <p class="hero-text">Thank you for shopping with JoyBox. The summary below is filled from the checkout result.</p>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="container">
+        <div class="success-card">
+          <h2 id="success-order-id">Order</h2>
+          <p id="success-payment-method">Payment method</p>
+          <p id="success-amount">Amount</p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="shop.html">Continue Shopping</a>
+            <a class="button button-secondary" href="contact.html">Need Support?</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-row">
+      <p>&copy; 2026 JoyBox Gifts & Toys</p>
+      <p>Order confirmation and support.</p>
+    </div>
+  </footer>
+
+  <div class="toast" id="toast" hidden></div>
+  <script src="script.js"></script>
+</body>
+</html>

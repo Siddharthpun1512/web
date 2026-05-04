@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checkout | JoyBox Gifts & Toys</title>
+  <meta name="description" content="Checkout your JoyBox order with shipping details and payment method selection.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="checkout">
+  <header class="site-header">
+    <div class="container nav-bar">
+      <a class="brand" href="index.html">JoyBox</a>
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-label="Open navigation">
+        <span></span>
+        <span></span>
+      </button>
+      <nav class="nav-links" id="site-nav">
+        <a href="index.html">Home</a>
+        <a href="shop.html">Shop</a>
+        <a href="about.html">About</a>
+        <a href="contact.html">Contact</a>
+        <a href="policies.html">Policies</a>
+        <a class="nav-cart" href="checkout.html">Cart <span data-cart-count>0</span></a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero">
+      <div class="container narrow-copy">
+        <p class="eyebrow">Checkout</p>
+        <h1>Complete your order with address details and payment selection.</h1>
+        <p class="hero-text">This checkout supports cash on delivery and a Razorpay-ready online payment flow.</p>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="container checkout-layout">
+        <form class="form-card" id="checkout-form">
+          <div class="checkout-header-row">
+            <div>
+              <p class="eyebrow">Shipping Details</p>
+              <h2>Delivery information</h2>
+            </div>
+            <span class="status-badge" id="payment-status">Checking payment gateway</span>
+          </div>
+          <div class="form-grid">
+            <label><span>Full name</span><input type="text" name="name" required></label>
+            <label><span>Email</span><input type="email" name="email" required></label>
+            <label><span>Phone</span><input type="tel" name="phone" required></label>
+            <label><span>Pincode</span><input type="text" name="pincode" required></label>
+            <label class="label-full"><span>Address</span><textarea name="address" rows="4" required></textarea></label>
+            <label><span>City</span><input type="text" name="city" required></label>
+            <label><span>State</span><input type="text" name="state" required></label>
+          </div>
+
+          <div class="payment-options">
+            <label class="payment-option">
+              <input type="radio" name="paymentMethod" value="razorpay" checked>
+              <div>
+                <strong>Pay Online</strong>
+                <span>Razorpay checkout</span>
+              </div>
+            </label>
+            <label class="payment-option">
+              <input type="radio" name="paymentMethod" value="cod">
+              <div>
+                <strong>Cash On Delivery</strong>
+                <span>Pay when the order arrives</span>
+              </div>
+            </label>
+          </div>
+
+          <div class="form-actions">
+            <button class="button button-primary" type="submit" id="place-order-button">Place Order</button>
+            <p class="form-message" id="checkout-message"></p>
+          </div>
+        </form>
+
+        <aside class="cart-panel checkout-summary-card">
+          <div class="cart-header">
+            <div>
+              <p class="eyebrow">Order Summary</p>
+              <h2>Your cart</h2>
+            </div>
+          </div>
+          <div class="checkout-items" id="checkout-items"></div>
+          <div class="cart-summary">
+            <div class="summary-row"><span>Subtotal</span><strong id="checkout-subtotal">Rs 0</strong></div>
+            <div class="summary-row"><span>Shipping</span><strong id="shipping-charge">Rs 0</strong></div>
+            <div class="summary-row summary-total"><span>Total</span><strong id="checkout-total">Rs 0</strong></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-row">
+      <p>&copy; 2026 JoyBox Gifts & Toys</p>
+      <p>Secure checkout and order capture.</p>
+    </div>
+  </footer>
+
+  <div class="toast" id="toast" hidden></div>
+  <script src="script.js"></script>
+</body>
+</html>
