@@ -1,0 +1,13 @@
+{
+  "name": "joybox-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lightweight backend for the JoyBox storefront",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "mongoose": "^8.9.5",
+    "nodemailer": "^6.9.16"
+  }
+}
