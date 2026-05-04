@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Signup | JoyBox Gifts & Toys</title>
+  <meta name="description" content="Create a JoyBox account.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="signup">
+  <header class="site-header">
+    <div class="container nav-bar">
+      <a class="brand" href="index.html">JoyBox</a>
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-label="Open navigation">
+        <span></span>
+        <span></span>
+      </button>
+      <nav class="nav-links" id="site-nav">
+        <a href="index.html">Home</a>
+        <a href="shop.html">Shop</a>
+        <a href="about.html">About</a>
+        <a href="contact.html">Contact</a>
+        <a href="policies.html">Policies</a>
+        <a class="nav-cart" href="checkout.html">Cart <span data-cart-count>0</span></a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero auth-hero">
+      <div class="container auth-layout">
+        <div class="narrow-copy">
+          <p class="eyebrow">Create Account</p>
+          <h1>Signup and start using JoyBox.</h1>
+          <p class="hero-text">Anyone can create an account with a name, email, and password.</p>
+        </div>
+
+        <form class="form-card auth-card" id="auth-form">
+          <div>
+            <p class="eyebrow">Signup</p>
+            <h2>New account</h2>
+          </div>
+          <label><span>Full name</span><input type="text" name="name" autocomplete="name" required></label>
+          <label><span>Email</span><input type="email" name="email" autocomplete="email" required></label>
+          <label><span>Phone</span><input type="tel" name="phone" autocomplete="tel"></label>
+          <label><span>Password</span><input type="password" name="password" autocomplete="new-password" minlength="6" required></label>
+          <div class="form-actions">
+            <button class="button button-primary" type="submit" id="auth-submit">Signup</button>
+            <p class="form-message" id="auth-message"></p>
+          </div>
+          <p class="auth-switch">Already have an account? <a class="text-link" href="login.html">Login instead</a></p>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-row">
+      <p>&copy; 2026 JoyBox Gifts & Toys</p>
+      <p>Simple account creation for every customer.</p>
+    </div>
+  </footer>
+
+  <div class="toast" id="toast" hidden></div>
+  <script src="script.js"></script>
+</body>
+</html>

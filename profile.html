@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Account | JoyBox Gifts & Toys</title>
+  <meta name="description" content="Manage your JoyBox account, address, password, and order history.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="profile">
+  <header class="site-header">
+    <div class="container nav-bar">
+      <a class="brand" href="index.html">JoyBox</a>
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-label="Open navigation">
+        <span></span>
+        <span></span>
+      </button>
+      <nav class="nav-links" id="site-nav">
+        <a href="index.html">Home</a>
+        <a href="shop.html">Shop</a>
+        <a href="about.html">About</a>
+        <a href="contact.html">Contact</a>
+        <a href="policies.html">Policies</a>
+        <a class="nav-cart" href="checkout.html">Cart <span data-cart-count>0</span></a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero">
+      <div class="container profile-hero">
+        <div class="profile-avatar" id="profile-initials">U</div>
+        <div>
+          <p class="eyebrow">Your Account</p>
+          <h1 id="profile-name">Loading account</h1>
+          <p class="hero-text"><span id="profile-email"></span> <span id="profile-phone"></span></p>
+        </div>
+        <button class="button button-secondary" type="button" id="logout-button">Logout</button>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="container profile-layout">
+        <aside class="profile-sidebar">
+          <article class="sidebar-card">
+            <p class="eyebrow">Orders</p>
+            <h2 id="profile-order-count">0</h2>
+            <p>Total orders connected to this account.</p>
+          </article>
+          <article class="sidebar-card">
+            <p class="eyebrow">Address</p>
+            <p>Save your delivery address once and checkout faster next time.</p>
+            <a class="button button-primary button-block" href="shop.html">Continue Shopping</a>
+          </article>
+        </aside>
+
+        <div class="profile-main">
+          <form class="form-card" id="profile-form">
+            <div class="checkout-header-row">
+              <div>
+                <p class="eyebrow">Personal Info</p>
+                <h2>Profile and delivery address</h2>
+              </div>
+              <p class="form-message" id="profile-message"></p>
+            </div>
+            <div class="form-grid">
+              <label><span>Full name</span><input type="text" name="name" required></label>
+              <label><span>Email</span><input type="email" name="email" disabled></label>
+              <label><span>Phone</span><input type="tel" name="phone"></label>
+              <label><span>Pincode</span><input type="text" name="pincode"></label>
+              <label class="label-full"><span>Address</span><textarea name="street" rows="4"></textarea></label>
+              <label><span>City</span><input type="text" name="city"></label>
+              <label><span>State</span><input type="text" name="state"></label>
+              <label><span>Country</span><input type="text" name="country"></label>
+            </div>
+            <div class="form-actions">
+              <button class="button button-primary" type="submit">Save Profile</button>
+            </div>
+          </form>
+
+          <form class="form-card" id="password-form">
+            <div class="checkout-header-row">
+              <div>
+                <p class="eyebrow">Security</p>
+                <h2>Change password</h2>
+              </div>
+              <p class="form-message" id="password-message"></p>
+            </div>
+            <div class="form-grid">
+              <label><span>Current password</span><input type="password" name="currentPassword" autocomplete="current-password" required></label>
+              <label><span>New password</span><input type="password" name="newPassword" autocomplete="new-password" minlength="6" required></label>
+            </div>
+            <div class="form-actions">
+              <button class="button button-secondary" type="submit">Update Password</button>
+            </div>
+          </form>
+
+          <section class="form-card">
+            <div class="checkout-header-row">
+              <div>
+                <p class="eyebrow">Order History</p>
+                <h2>Your orders</h2>
+              </div>
+            </div>
+            <div class="profile-orders" id="profile-orders">
+              <p class="empty-state">Loading orders...</p>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-row">
+      <p>&copy; 2026 JoyBox Gifts & Toys</p>
+      <p>Profile, address, security, and orders.</p>
+    </div>
+  </footer>
+
+  <div class="toast" id="toast" hidden></div>
+  <script src="script.js"></script>
+</body>
+</html>
