@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const bcrypt = require("bcryptjs");
 
 const usersPath = path.resolve(__dirname, "..", "data", "users.json");
 const tokenMaxAgeMs = 7 * 24 * 60 * 60 * 1000;
@@ -19,7 +20,7 @@ function signupUser(payload) {
   }
 
   const users = readUsers();
-  if (users.some((user) => user.email === email)) {
+  if (users.some((user) => normalizeEmail(user.email) === email)) {
     throw new Error("Email is already registered.");
   }
 
@@ -49,9 +50,16 @@ function loginUser(payload) {
     throw new Error("Password is required.");
   }
 
-  const user = readUsers().find((entry) => entry.email === email);
-  if (!user || !verifyPassword(password, user.passwordHash)) {
+  const users = readUsers();
+  const user = users.find((entry) => normalizeEmail(entry.email) === email);
+
+  if (!user || !verifyUserPassword(password, user)) {
     throw new Error("Invalid email or password.");
+  }
+
+  if (needsUserAuthUpgrade(user)) {
+    upgradeUserAuthRecord(user, password);
+    writeUsers(users);
   }
 
   return createAuthResponse(user);
@@ -63,7 +71,7 @@ function getUserFromToken(token) {
 
 function getUserRecordFromToken(token) {
   const decoded = verifyToken(token);
-  const user = readUsers().find((entry) => entry.id === decoded.id);
+  const user = readUsers().find((entry) => getUserId(entry) === decoded.id);
 
   if (!user) {
     throw new Error("User account was not found.");
@@ -75,7 +83,7 @@ function getUserRecordFromToken(token) {
 function updateUserProfile(token, payload) {
   const currentUser = getUserRecordFromToken(token);
   const users = readUsers();
-  const user = users.find((entry) => entry.id === currentUser.id);
+  const user = users.find((entry) => getUserId(entry) === getUserId(currentUser));
   const name = String(payload.name || "").trim();
   const phone = String(payload.phone || "").trim();
   const address = normalizeAddress(payload.address || {});
@@ -97,7 +105,7 @@ function updateUserProfile(token, payload) {
 function changeUserPassword(token, payload) {
   const currentUser = getUserRecordFromToken(token);
   const users = readUsers();
-  const user = users.find((entry) => entry.id === currentUser.id);
+  const user = users.find((entry) => getUserId(entry) === getUserId(currentUser));
   const currentPassword = String(payload.currentPassword || "");
   const nextPassword = String(payload.newPassword || "");
 
@@ -122,7 +130,7 @@ function createAuthResponse(user) {
 
 function publicUser(user) {
   return {
-    id: user.id,
+    id: getUserId(user),
     name: user.name,
     email: user.email,
     phone: user.phone || "",
@@ -133,7 +141,7 @@ function publicUser(user) {
 
 function signToken(user) {
   const payload = {
-    id: user.id,
+    id: getUserId(user),
     email: user.email,
     exp: Date.now() + tokenMaxAgeMs
   };
@@ -189,6 +197,41 @@ function verifyPassword(password, storedHash) {
   return savedHash.length === candidateHash.length && crypto.timingSafeEqual(savedHash, candidateHash);
 }
 
+function verifyUserPassword(password, user) {
+  if (!user) {
+    return false;
+  }
+
+  if (verifyPassword(password, user.passwordHash)) {
+    return true;
+  }
+
+  const legacyPassword = String(user.password || "");
+  if (legacyPassword.startsWith("$2a$") || legacyPassword.startsWith("$2b$") || legacyPassword.startsWith("$2y$")) {
+    return bcrypt.compareSync(password, legacyPassword);
+  }
+
+  return false;
+}
+
+function needsUserAuthUpgrade(user) {
+  return Boolean(user && (!user.id || !user.passwordHash || user.password));
+}
+
+function upgradeUserAuthRecord(user, password) {
+  user.id = getUserId(user);
+  user.email = normalizeEmail(user.email);
+  user.address = normalizeAddress(user.address || {});
+  user.passwordHash = hashPassword(password);
+  delete user.password;
+  user.updatedAt = new Date().toISOString();
+  user.createdAt = user.createdAt || user.updatedAt;
+}
+
+function getUserId(user) {
+  return String(user?.id || user?._id || "");
+}
+
 function validateName(name) {
   if (name.length < 2) {
     throw new Error("Name must be at least 2 characters.");
@@ -222,7 +265,7 @@ function normalizeAddress(address) {
     street: String(address.street || "").trim(),
     city: String(address.city || "").trim(),
     state: String(address.state || "").trim(),
-    pincode: String(address.pincode || "").trim(),
+    pincode: String(address.pincode || address.zip || "").trim(),
     country: String(address.country || "India").trim()
   };
 }

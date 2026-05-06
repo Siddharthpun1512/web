@@ -144,6 +144,9 @@ async function seedProductsIfEmpty() {
 function cleanDocs(docs) {
   return docs.map((doc) => {
     const { _id, __v, ...cleaned } = doc;
+    if (!cleaned.id && _id) {
+      cleaned.id = String(_id);
+    }
     return cleaned;
   });
 }
