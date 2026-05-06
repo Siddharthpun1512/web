@@ -32,8 +32,10 @@ const isRazorpayEnabled = Boolean(razorpayKeyId && razorpayKeySecret);
 const adminEmail = String(process.env.ADMIN_EMAIL || "joybox.admin.7294@joybox.local").trim().toLowerCase();
 const adminId = process.env.ADMIN_ID || process.env.OWNER_ID || adminEmail;
 const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
-const testAdminEmail = "admin.test@joybox.local";
-const testAdminPassword = "JoyBoxAdmin@2026";
+const predefinedAdminCredentials = [
+  { email: "admin@joybox.com", password: "admin123" },
+  { email: "admin.test@joybox.local", password: "JoyBoxAdmin@2026" }
+];
 const legacyOwnerPassword = process.env.OWNER_PASSWORD || "";
 const ownerTokenSecret = process.env.OWNER_TOKEN_SECRET || process.env.AUTH_TOKEN_SECRET || "change-owner-secret-in-backend-env";
 const isProduction = process.env.NODE_ENV === "production";
@@ -918,9 +920,11 @@ function isAdminCredential(identifier, password, options = {}) {
   const cleanIdentifier = String(identifier || "").trim().toLowerCase();
   const configuredIdentifierMatches = cleanIdentifier === adminEmail || cleanIdentifier === String(adminId).toLowerCase();
   const configuredPasswordMatches = password === adminPassword || (options?.allowLegacyPassword && legacyOwnerPassword && password === legacyOwnerPassword);
-  const testCredentialMatches = cleanIdentifier === testAdminEmail && password === testAdminPassword;
+  const predefinedCredentialMatches = predefinedAdminCredentials.some(
+    (credential) => cleanIdentifier === credential.email && password === credential.password
+  );
 
-  return Boolean(cleanIdentifier && password && ((configuredIdentifierMatches && configuredPasswordMatches) || testCredentialMatches));
+  return Boolean(cleanIdentifier && password && ((configuredIdentifierMatches && configuredPasswordMatches) || predefinedCredentialMatches));
 }
 
 function createAdminLoginResponse(identifier = adminEmail) {
