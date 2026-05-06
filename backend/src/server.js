@@ -46,6 +46,7 @@ const mimeTypes = {
   ".css": "text/css; charset=utf-8",
   ".js": "application/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".csv": "text/csv; charset=utf-8",
   ".png": "image/png",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
@@ -131,6 +132,20 @@ const server = http.createServer(async (request, response) => {
       requireOwner(request);
       const orders = (await readOrders()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       sendJson(response, 200, { orders });
+    } catch (error) {
+      sendJson(response, 401, { error: error.message || "Admin login required." });
+    }
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/owner/orders/export") {
+    try {
+      requireOwner(request);
+      const orders = (await readOrders()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      const csv = createOrdersCsv(orders);
+
+      response.setHeader("Content-Disposition", `attachment; filename="joybox-orders-${new Date().toISOString().slice(0, 10)}.csv"`);
+      send(response, 200, mimeTypes[".csv"], csv);
     } catch (error) {
       sendJson(response, 401, { error: error.message || "Admin login required." });
     }
@@ -851,6 +866,63 @@ function createProductId(name) {
 function publicAdminUser(user) {
   const { passwordHash, ...safeUser } = user || {};
   return safeUser;
+}
+
+function createOrdersCsv(orders) {
+  const rows = [
+    [
+      "Order ID",
+      "Created At",
+      "Customer Name",
+      "Customer Email",
+      "Phone",
+      "Address",
+      "Items",
+      "Payment Method",
+      "Payment Status",
+      "Order Status",
+      "Subtotal",
+      "Shipping",
+      "Total"
+    ]
+  ];
+
+  for (const order of orders) {
+    const customer = order.customer || {};
+    const totals = order.totals || {};
+    const address = [
+      customer.address,
+      customer.city,
+      customer.state,
+      customer.pincode
+    ].filter(Boolean).join(", ");
+    const items = (order.items || [])
+      .map((item) => `${item.name || item.id || "Item"} x ${item.quantity || 1}`)
+      .join("; ");
+
+    rows.push([
+      order.id || "",
+      order.createdAt || "",
+      customer.name || "",
+      customer.email || "",
+      customer.phone || "",
+      address,
+      items,
+      order.paymentMethod || "",
+      order.paymentStatus || "",
+      order.status || "",
+      totals.subtotal || 0,
+      totals.shipping || 0,
+      totals.total || 0
+    ]);
+  }
+
+  return rows.map((row) => row.map(escapeCsvCell).join(",")).join("\n");
+}
+
+function escapeCsvCell(value) {
+  const text = String(value ?? "");
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
 function isAdminCredential(identifier, password, options = {}) {

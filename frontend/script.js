@@ -13,6 +13,7 @@ const API = {
   ownerLogin: "/api/owner/login",
   ownerProducts: "/api/owner/products",
   ownerOrders: "/api/owner/orders",
+  ownerOrdersExport: "/api/owner/orders/export",
   ownerUsers: "/api/owner/users",
   ownerContacts: "/api/owner/contacts",
   ownerExport: "/api/owner/export"
@@ -293,8 +294,8 @@ function initAuthPage(mode) {
       });
 
       setAuth(result);
-      if (result.user?.role === "admin" && result.adminToken) {
-        setOwnerToken(result.adminToken);
+      if (result.user?.role === "admin") {
+        setOwnerToken(result.adminToken || result.token);
       }
       showToast(mode === "signup" ? "Account created." : "Logged in.");
       window.location.href = result.user?.role === "admin" ? "admin.html" : nextPage || "profile.html";
@@ -476,8 +477,9 @@ async function initOwnerPage() {
   const productMessage = document.querySelector("#owner-product-message");
   const logoutButton = document.querySelector("#owner-logout-button");
   const resetButton = document.querySelector("#owner-reset-button");
-  const exportButton = document.querySelector("#admin-export-button");
+  const exportButton = document.querySelector("#admin-order-export-button");
   const exportMessage = document.querySelector("#admin-export-message");
+  const refreshOrdersButton = document.querySelector("#admin-refresh-orders-button");
   const summaryGrid = document.querySelector("#admin-summary-grid");
   const orderList = document.querySelector("#admin-order-list");
   const userList = document.querySelector("#admin-user-list");
@@ -614,10 +616,12 @@ async function initOwnerPage() {
 
   resetButton?.addEventListener("click", resetOwnerForm);
 
-  exportButton?.addEventListener("click", downloadAdminData);
+  exportButton?.addEventListener("click", downloadOrderData);
+  refreshOrdersButton?.addEventListener("click", refreshAdminOrders);
 
   logoutButton?.addEventListener("click", () => {
     clearOwnerToken();
+    clearAuth();
     showOwnerLogin();
     showToast("Admin logged out.");
   });
@@ -628,17 +632,15 @@ async function initOwnerPage() {
     productMessage.textContent = "Loading products...";
 
     try {
-      const [productResult, orderResult, userResult, contactResult] = await Promise.all([
+      const [productResult, orderResult] = await Promise.all([
         apiJson(API.ownerProducts, { headers: ownerHeaders() }),
-        apiJson(API.ownerOrders, { headers: ownerHeaders() }),
-        apiJson(API.ownerUsers, { headers: ownerHeaders() }),
-        apiJson(API.ownerContacts, { headers: ownerHeaders() })
+        apiJson(API.ownerOrders, { headers: ownerHeaders() })
       ]);
 
       products = productResult.products || [];
       orders = orderResult.orders || [];
-      users = userResult.users || [];
-      contacts = contactResult.contacts || [];
+      users = [];
+      contacts = [];
       renderAdminSummary();
       renderAdminOrders();
       renderAdminUsers();
@@ -668,10 +670,8 @@ async function initOwnerPage() {
     summaryGrid.innerHTML = `
       <article class="admin-stat"><span>Products</span><strong>${products.length}</strong></article>
       <article class="admin-stat"><span>Orders</span><strong>${orders.length}</strong></article>
-      <article class="admin-stat"><span>Users</span><strong>${users.length}</strong></article>
       <article class="admin-stat"><span>Revenue</span><strong>${formatCurrency(totalRevenue)}</strong></article>
       <article class="admin-stat"><span>Pending</span><strong>${pendingOrders}</strong></article>
-      <article class="admin-stat"><span>Messages</span><strong>${contacts.length}</strong></article>
     `;
   }
 
@@ -688,6 +688,9 @@ async function initOwnerPage() {
     orderList.innerHTML = orders
       .map((order) => {
         const itemCount = (order.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+        const itemNames = (order.items || [])
+          .map((item) => `${escapeHtml(item.name || item.id || "Item")} x ${Number(item.quantity || 1)}`)
+          .join(", ");
         const address = [
           order.customer?.address,
           order.customer?.city,
@@ -702,6 +705,7 @@ async function initOwnerPage() {
               <p>${escapeHtml(order.customer?.name || "Customer")} - ${escapeHtml(order.customer?.phone || "")}</p>
               <p>${escapeHtml(order.customer?.email || "")}</p>
               <p>${escapeHtml(address)}</p>
+              <p>${itemNames || "No item details"}</p>
             </div>
             <div class="admin-record__meta">
               <strong>${formatCurrency(order.totals?.total || 0)}</strong>
@@ -780,7 +784,35 @@ async function initOwnerPage() {
       .join("");
   }
 
-  async function downloadAdminData() {
+  async function refreshAdminOrders() {
+    if (refreshOrdersButton) {
+      refreshOrdersButton.disabled = true;
+    }
+
+    if (exportMessage) {
+      exportMessage.textContent = "Refreshing orders...";
+    }
+
+    try {
+      const orderResult = await apiJson(API.ownerOrders, { headers: ownerHeaders() });
+      orders = orderResult.orders || [];
+      renderAdminSummary();
+      renderAdminOrders();
+      if (exportMessage) {
+        exportMessage.textContent = "Orders refreshed.";
+      }
+    } catch (error) {
+      if (exportMessage) {
+        exportMessage.textContent = error.message || "Unable to refresh orders.";
+      }
+    } finally {
+      if (refreshOrdersButton) {
+        refreshOrdersButton.disabled = false;
+      }
+    }
+  }
+
+  async function downloadOrderData() {
     if (!exportButton) {
       return;
     }
@@ -791,17 +823,17 @@ async function initOwnerPage() {
     }
 
     try {
-      const response = await fetch(API.ownerExport, { headers: ownerHeaders() });
+      const response = await fetch(API.ownerOrdersExport, { headers: ownerHeaders() });
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || "Unable to download data.");
+        throw new Error(data.error || "Unable to download order data.");
       }
 
       const blob = await response.blob();
       const downloadUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = downloadUrl;
-      link.download = `joybox-data-${new Date().toISOString().slice(0, 10)}.json`;
+      link.download = `joybox-orders-${new Date().toISOString().slice(0, 10)}.csv`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -810,7 +842,7 @@ async function initOwnerPage() {
       if (exportMessage) {
         exportMessage.textContent = "Download started.";
       }
-      showToast("Store data download started.");
+      showToast("Order data download started.");
     } catch (error) {
       if (exportMessage) {
         exportMessage.textContent = error.message || "Unable to download data.";
@@ -1572,7 +1604,13 @@ function getSafeNextPage() {
 }
 
 function getOwnerToken() {
-  return localStorage.getItem(OWNER_KEY) || "";
+  const ownerToken = localStorage.getItem(OWNER_KEY) || "";
+  if (ownerToken) {
+    return ownerToken;
+  }
+
+  const auth = getAuth();
+  return auth?.user?.role === "admin" ? auth.token || "" : "";
 }
 
 function setOwnerToken(token) {

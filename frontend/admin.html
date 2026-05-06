@@ -33,8 +33,8 @@
     <section class="page-hero">
       <div class="container narrow-copy">
         <p class="eyebrow">Admin Area</p>
-        <h1>Admin panel for the store catalog.</h1>
-        <p class="hero-text">Login with the admin email and password to add, edit, and remove products from the JoyBox storefront.</p>
+        <h1>Admin dashboard for products and orders.</h1>
+        <p class="hero-text">Login from the account page with the admin email and password, then manage products and download order data here.</p>
       </div>
     </section>
 
@@ -58,10 +58,11 @@
             <div class="checkout-header-row">
               <div>
                 <p class="eyebrow">Admin Overview</p>
-                <h2>Store data</h2>
+                <h2>Store overview</h2>
               </div>
               <div class="admin-export-actions">
-                <button class="button button-secondary" type="button" id="admin-export-button">Download Data</button>
+                <button class="button button-secondary" type="button" id="admin-refresh-orders-button">Refresh Orders</button>
+                <button class="button button-primary" type="button" id="admin-order-export-button">Download Orders</button>
                 <p class="form-message" id="admin-export-message"></p>
               </div>
             </div>
@@ -76,26 +77,6 @@
               </div>
             </div>
             <div class="admin-record-list" id="admin-order-list"></div>
-          </section>
-
-          <section class="form-card">
-            <div class="checkout-header-row">
-              <div>
-                <p class="eyebrow">Users</p>
-                <h2>Registered customers</h2>
-              </div>
-            </div>
-            <div class="admin-record-list" id="admin-user-list"></div>
-          </section>
-
-          <section class="form-card">
-            <div class="checkout-header-row">
-              <div>
-                <p class="eyebrow">Messages</p>
-                <h2>Contact requests</h2>
-              </div>
-            </div>
-            <div class="admin-record-list" id="admin-contact-list"></div>
           </section>
 
           <form class="form-card" id="owner-product-form">
