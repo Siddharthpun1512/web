@@ -31,7 +31,8 @@ const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET || "";
 const isRazorpayEnabled = Boolean(razorpayKeyId && razorpayKeySecret);
 const adminEmail = String(process.env.ADMIN_EMAIL || "joybox.admin.7294@joybox.local").trim().toLowerCase();
 const adminId = process.env.ADMIN_ID || process.env.OWNER_ID || adminEmail;
-const adminPassword = process.env.ADMIN_PASSWORD || process.env.OWNER_PASSWORD || "admin123";
+const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
+const legacyOwnerPassword = process.env.OWNER_PASSWORD || "";
 const ownerTokenSecret = process.env.OWNER_TOKEN_SECRET || process.env.AUTH_TOKEN_SECRET || "change-owner-secret-in-backend-env";
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -103,7 +104,7 @@ const server = http.createServer(async (request, response) => {
       const incomingAdminId = String(payload.adminEmail || payload.adminId || payload.ownerId || "").trim().toLowerCase();
       const password = String(payload.password || "");
 
-      if (!isAdminCredential(incomingAdminId, password)) {
+      if (!isAdminCredential(incomingAdminId, password, { allowLegacyPassword: true })) {
         sendJson(response, 401, { error: "Invalid admin email or password." });
         return;
       }
@@ -852,9 +853,12 @@ function publicAdminUser(user) {
   return safeUser;
 }
 
-function isAdminCredential(identifier, password) {
+function isAdminCredential(identifier, password, options = {}) {
   const cleanIdentifier = String(identifier || "").trim().toLowerCase();
-  return Boolean(cleanIdentifier && password && (cleanIdentifier === adminEmail || cleanIdentifier === String(adminId).toLowerCase()) && password === adminPassword);
+  const identifierMatches = cleanIdentifier === adminEmail || cleanIdentifier === String(adminId).toLowerCase();
+  const passwordMatches = password === adminPassword || (options?.allowLegacyPassword && legacyOwnerPassword && password === legacyOwnerPassword);
+
+  return Boolean(cleanIdentifier && password && identifierMatches && passwordMatches);
 }
 
 function createAdminLoginResponse() {
