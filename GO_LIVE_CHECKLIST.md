@@ -15,7 +15,7 @@ STORE_EMAIL=your-real-store-email@example.com
 MONGO_URI=mongodb+srv://your_db_user:your_encoded_password@your_cluster.mongodb.net/joybox?retryWrites=true&w=majority
 MONGO_DB_NAME=joybox_store
 AUTH_TOKEN_SECRET=use-a-long-random-secret
-ADMIN_ID=use-a-private-admin-id
+ADMIN_EMAIL=use-a-private-admin-email
 ADMIN_PASSWORD=use-a-strong-admin-password
 OWNER_TOKEN_SECRET=use-a-different-long-random-secret
 RAZORPAY_KEY_ID=rzp_live_your_live_key
@@ -29,7 +29,7 @@ For Atlas, add your Render service's outbound IP range in **Network Access**. If
 ## Before Launch
 
 - Replace Razorpay test keys with live Razorpay keys.
-- Change the admin ID and password from the local defaults.
+- Change the admin email and password from the local defaults.
 - Create at least one real customer account and test checkout.
 - Add real product photos from the admin panel at `/admin.html`.
 - Check `/api/readiness` after deployment.

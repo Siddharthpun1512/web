@@ -29,7 +29,8 @@ const storeEmail = process.env.STORE_EMAIL || "siddharthpun1512@gamil.com.com";
 const razorpayKeyId = process.env.RAZORPAY_KEY_ID || "";
 const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET || "";
 const isRazorpayEnabled = Boolean(razorpayKeyId && razorpayKeySecret);
-const adminId = process.env.ADMIN_ID || process.env.OWNER_ID || "admin";
+const adminEmail = String(process.env.ADMIN_EMAIL || "joybox.admin.7294@joybox.local").trim().toLowerCase();
+const adminId = process.env.ADMIN_ID || process.env.OWNER_ID || adminEmail;
 const adminPassword = process.env.ADMIN_PASSWORD || process.env.OWNER_PASSWORD || "admin123";
 const ownerTokenSecret = process.env.OWNER_TOKEN_SECRET || process.env.AUTH_TOKEN_SECRET || "change-owner-secret-in-backend-env";
 const isProduction = process.env.NODE_ENV === "production";
@@ -99,11 +100,11 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "POST" && url.pathname === "/api/owner/login") {
     try {
       const payload = await readRequestBody(request);
-      const incomingAdminId = String(payload.adminId || payload.ownerId || "").trim();
+      const incomingAdminId = String(payload.adminEmail || payload.adminId || payload.ownerId || "").trim().toLowerCase();
       const password = String(payload.password || "");
 
-      if (!incomingAdminId || incomingAdminId !== adminId || !password || password !== adminPassword) {
-        sendJson(response, 401, { error: "Invalid admin ID or password." });
+      if (!isAdminCredential(incomingAdminId, password)) {
+        sendJson(response, 401, { error: "Invalid admin email or password." });
         return;
       }
 
@@ -248,6 +249,14 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "POST" && url.pathname === "/api/auth/login") {
     try {
       const payload = await readRequestBody(request);
+      const email = String(payload.email || "").trim().toLowerCase();
+      const password = String(payload.password || "");
+
+      if (isAdminCredential(email, password)) {
+        sendJson(response, 200, createAdminLoginResponse());
+        return;
+      }
+
       sendJson(response, 200, await loginUser(payload));
     } catch (error) {
       sendJson(response, 401, { error: error.message || "Unable to login." });
@@ -731,8 +740,8 @@ function assertProductionConfig() {
     missing.push("MONGO_URI");
   }
 
-  if (!process.env.ADMIN_ID && !process.env.OWNER_ID) {
-    missing.push("ADMIN_ID");
+  if (!process.env.ADMIN_EMAIL && !process.env.ADMIN_ID && !process.env.OWNER_ID) {
+    missing.push("ADMIN_EMAIL");
   }
 
   if (
@@ -841,6 +850,35 @@ function createProductId(name) {
 function publicAdminUser(user) {
   const { passwordHash, ...safeUser } = user || {};
   return safeUser;
+}
+
+function isAdminCredential(identifier, password) {
+  const cleanIdentifier = String(identifier || "").trim().toLowerCase();
+  return Boolean(cleanIdentifier && password && (cleanIdentifier === adminEmail || cleanIdentifier === String(adminId).toLowerCase()) && password === adminPassword);
+}
+
+function createAdminLoginResponse() {
+  const adminToken = signOwnerToken(adminEmail);
+
+  return {
+    token: adminToken,
+    adminToken,
+    user: {
+      id: "ADMIN",
+      name: "JoyBox Admin",
+      email: adminEmail,
+      phone: "",
+      role: "admin",
+      address: {
+        street: "",
+        city: "",
+        state: "",
+        pincode: "",
+        country: "India"
+      },
+      createdAt: ""
+    }
+  };
 }
 
 function getBearerToken(request) {

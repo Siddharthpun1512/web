@@ -239,7 +239,11 @@ function initAuthNavigation() {
   const auth = getAuth();
   const authLink = document.createElement("a");
 
-  if (auth?.user) {
+  if (auth?.user?.role === "admin") {
+    authLink.href = "admin.html";
+    authLink.className = "nav-auth";
+    authLink.textContent = "Admin";
+  } else if (auth?.user) {
     authLink.href = "profile.html";
     authLink.className = "nav-auth";
     authLink.textContent = `Account`;
@@ -260,7 +264,7 @@ function initAuthPage(mode) {
   const nextPage = getSafeNextPage();
 
   if (auth?.token && auth?.user) {
-    window.location.href = nextPage || "profile.html";
+    window.location.href = auth.user.role === "admin" ? "admin.html" : nextPage || "profile.html";
     return;
   }
 
@@ -289,8 +293,11 @@ function initAuthPage(mode) {
       });
 
       setAuth(result);
+      if (result.user?.role === "admin" && result.adminToken) {
+        setOwnerToken(result.adminToken);
+      }
       showToast(mode === "signup" ? "Account created." : "Logged in.");
-      window.location.href = nextPage || "profile.html";
+      window.location.href = result.user?.role === "admin" ? "admin.html" : nextPage || "profile.html";
     } catch (error) {
       messageEl.textContent = error.message || "Unable to continue.";
       submitButton.disabled = false;
