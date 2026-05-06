@@ -11,7 +11,11 @@ const API = {
   profilePassword: "/api/profile/password",
   profileOrders: "/api/profile/orders",
   ownerLogin: "/api/owner/login",
-  ownerProducts: "/api/owner/products"
+  ownerProducts: "/api/owner/products",
+  ownerOrders: "/api/owner/orders",
+  ownerUsers: "/api/owner/users",
+  ownerContacts: "/api/owner/contacts",
+  ownerExport: "/api/owner/export"
 };
 
 const CART_KEY = "joybox-cart";
@@ -253,9 +257,10 @@ function initAuthPage(mode) {
   const messageEl = document.querySelector("#auth-message");
   const submitButton = document.querySelector("#auth-submit");
   const auth = getAuth();
+  const nextPage = getSafeNextPage();
 
   if (auth?.token && auth?.user) {
-    window.location.href = "profile.html";
+    window.location.href = nextPage || "profile.html";
     return;
   }
 
@@ -285,7 +290,7 @@ function initAuthPage(mode) {
 
       setAuth(result);
       showToast(mode === "signup" ? "Account created." : "Logged in.");
-      window.location.href = "profile.html";
+      window.location.href = nextPage || "profile.html";
     } catch (error) {
       messageEl.textContent = error.message || "Unable to continue.";
       submitButton.disabled = false;
@@ -464,7 +469,16 @@ async function initOwnerPage() {
   const productMessage = document.querySelector("#owner-product-message");
   const logoutButton = document.querySelector("#owner-logout-button");
   const resetButton = document.querySelector("#owner-reset-button");
+  const exportButton = document.querySelector("#admin-export-button");
+  const exportMessage = document.querySelector("#admin-export-message");
+  const summaryGrid = document.querySelector("#admin-summary-grid");
+  const orderList = document.querySelector("#admin-order-list");
+  const userList = document.querySelector("#admin-user-list");
+  const contactList = document.querySelector("#admin-contact-list");
   let products = [];
+  let orders = [];
+  let users = [];
+  let contacts = [];
   let editingProductId = "";
 
   if (getOwnerToken()) {
@@ -477,19 +491,22 @@ async function initOwnerPage() {
     event.preventDefault();
     const formData = new FormData(loginForm);
 
-    loginMessage.textContent = "Checking owner password...";
+    loginMessage.textContent = "Checking admin credentials...";
 
     try {
       const result = await apiJson(API.ownerLogin, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: String(formData.get("password") || "") })
+        body: JSON.stringify({
+          adminId: String(formData.get("adminId") || "").trim(),
+          password: String(formData.get("password") || "")
+        })
       });
 
       setOwnerToken(result.token);
       loginForm.reset();
       await showOwnerDashboard();
-      showToast("Owner logged in.");
+      showToast("Admin logged in.");
     } catch (error) {
       loginMessage.textContent = error.message || "Unable to login.";
     }
@@ -590,10 +607,12 @@ async function initOwnerPage() {
 
   resetButton?.addEventListener("click", resetOwnerForm);
 
+  exportButton?.addEventListener("click", downloadAdminData);
+
   logoutButton?.addEventListener("click", () => {
     clearOwnerToken();
     showOwnerLogin();
-    showToast("Owner logged out.");
+    showToast("Admin logged out.");
   });
 
   async function showOwnerDashboard() {
@@ -602,20 +621,196 @@ async function initOwnerPage() {
     productMessage.textContent = "Loading products...";
 
     try {
-      const result = await apiJson(API.ownerProducts, { headers: ownerHeaders() });
-      products = result.products || [];
+      const [productResult, orderResult, userResult, contactResult] = await Promise.all([
+        apiJson(API.ownerProducts, { headers: ownerHeaders() }),
+        apiJson(API.ownerOrders, { headers: ownerHeaders() }),
+        apiJson(API.ownerUsers, { headers: ownerHeaders() }),
+        apiJson(API.ownerContacts, { headers: ownerHeaders() })
+      ]);
+
+      products = productResult.products || [];
+      orders = orderResult.orders || [];
+      users = userResult.users || [];
+      contacts = contactResult.contacts || [];
+      renderAdminSummary();
+      renderAdminOrders();
+      renderAdminUsers();
+      renderAdminContacts();
       renderOwnerProducts();
       productMessage.textContent = "";
     } catch (error) {
       clearOwnerToken();
       showOwnerLogin();
-      loginMessage.textContent = error.message || "Owner login expired.";
+      loginMessage.textContent = error.message || "Admin login expired.";
     }
   }
 
   function showOwnerLogin() {
     loginForm.hidden = false;
     dashboard.hidden = true;
+  }
+
+  function renderAdminSummary() {
+    if (!summaryGrid) {
+      return;
+    }
+
+    const totalRevenue = orders.reduce((sum, order) => sum + Number(order.totals?.total || 0), 0);
+    const pendingOrders = orders.filter((order) => /pending/i.test(order.status || order.paymentStatus || "")).length;
+
+    summaryGrid.innerHTML = `
+      <article class="admin-stat"><span>Products</span><strong>${products.length}</strong></article>
+      <article class="admin-stat"><span>Orders</span><strong>${orders.length}</strong></article>
+      <article class="admin-stat"><span>Users</span><strong>${users.length}</strong></article>
+      <article class="admin-stat"><span>Revenue</span><strong>${formatCurrency(totalRevenue)}</strong></article>
+      <article class="admin-stat"><span>Pending</span><strong>${pendingOrders}</strong></article>
+      <article class="admin-stat"><span>Messages</span><strong>${contacts.length}</strong></article>
+    `;
+  }
+
+  function renderAdminOrders() {
+    if (!orderList) {
+      return;
+    }
+
+    if (!orders.length) {
+      orderList.innerHTML = '<p class="empty-state">No orders have been placed yet.</p>';
+      return;
+    }
+
+    orderList.innerHTML = orders
+      .map((order) => {
+        const itemCount = (order.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+        const address = [
+          order.customer?.address,
+          order.customer?.city,
+          order.customer?.state,
+          order.customer?.pincode
+        ].filter(Boolean).join(", ");
+
+        return `
+          <article class="admin-record">
+            <div>
+              <strong>${escapeHtml(order.id)}</strong>
+              <p>${escapeHtml(order.customer?.name || "Customer")} - ${escapeHtml(order.customer?.phone || "")}</p>
+              <p>${escapeHtml(order.customer?.email || "")}</p>
+              <p>${escapeHtml(address)}</p>
+            </div>
+            <div class="admin-record__meta">
+              <strong>${formatCurrency(order.totals?.total || 0)}</strong>
+              <span>${itemCount} item${itemCount === 1 ? "" : "s"}</span>
+              <span>${escapeHtml(order.paymentMethod || "")} - ${escapeHtml(order.status || "")}</span>
+              <span>${formatDate(order.createdAt)}</span>
+            </div>
+          </article>
+        `;
+      })
+      .join("");
+  }
+
+  function renderAdminUsers() {
+    if (!userList) {
+      return;
+    }
+
+    if (!users.length) {
+      userList.innerHTML = '<p class="empty-state">No customer accounts yet.</p>';
+      return;
+    }
+
+    userList.innerHTML = users
+      .map((user) => {
+        const address = [
+          user.address?.street,
+          user.address?.city,
+          user.address?.state,
+          user.address?.pincode,
+          user.address?.country
+        ].filter(Boolean).join(", ");
+
+        return `
+          <article class="admin-record">
+            <div>
+              <strong>${escapeHtml(user.name || "Customer")}</strong>
+              <p>${escapeHtml(user.email || "")}</p>
+              <p>${escapeHtml(user.phone || "No phone saved")}</p>
+              <p>${escapeHtml(address || "No address saved")}</p>
+            </div>
+            <div class="admin-record__meta">
+              <span>${escapeHtml(user.id || "")}</span>
+              <span>${formatDate(user.createdAt)}</span>
+            </div>
+          </article>
+        `;
+      })
+      .join("");
+  }
+
+  function renderAdminContacts() {
+    if (!contactList) {
+      return;
+    }
+
+    if (!contacts.length) {
+      contactList.innerHTML = '<p class="empty-state">No contact messages yet.</p>';
+      return;
+    }
+
+    contactList.innerHTML = contacts
+      .map((contact) => `
+        <article class="admin-record">
+          <div>
+            <strong>${escapeHtml(contact.name || "Visitor")}</strong>
+            <p>${escapeHtml(contact.email || "")} ${contact.phone ? `- ${escapeHtml(contact.phone)}` : ""}</p>
+            <p>${escapeHtml(contact.message || "")}</p>
+          </div>
+          <div class="admin-record__meta">
+            <span>${escapeHtml(contact.id || "")}</span>
+            <span>${formatDate(contact.createdAt)}</span>
+          </div>
+        </article>
+      `)
+      .join("");
+  }
+
+  async function downloadAdminData() {
+    if (!exportButton) {
+      return;
+    }
+
+    exportButton.disabled = true;
+    if (exportMessage) {
+      exportMessage.textContent = "Preparing download...";
+    }
+
+    try {
+      const response = await fetch(API.ownerExport, { headers: ownerHeaders() });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Unable to download data.");
+      }
+
+      const blob = await response.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `joybox-data-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(downloadUrl);
+
+      if (exportMessage) {
+        exportMessage.textContent = "Download started.";
+      }
+      showToast("Store data download started.");
+    } catch (error) {
+      if (exportMessage) {
+        exportMessage.textContent = error.message || "Unable to download data.";
+      }
+    } finally {
+      exportButton.disabled = false;
+    }
   }
 
   function renderOwnerProducts() {
@@ -755,6 +950,10 @@ async function initShopPage() {
       return;
     }
 
+    if (!requireLoginToBuy("checkout.html")) {
+      return;
+    }
+
     window.location.href = "checkout.html";
   });
 
@@ -773,6 +972,10 @@ async function initShopPage() {
   modalBuyNow?.addEventListener("click", () => {
     const product = getSelectedProduct();
     if (!product) {
+      return;
+    }
+
+    if (!requireLoginToBuy("checkout.html")) {
       return;
     }
 
@@ -906,6 +1109,10 @@ async function initShopPage() {
         }
 
         if (action === "buy") {
+          if (!requireLoginToBuy("checkout.html")) {
+            return;
+          }
+
           cart = addToCart(product.id, 1);
           renderCart();
           window.location.href = "checkout.html";
@@ -1033,6 +1240,12 @@ async function initCheckoutPage() {
   const totals = calculateTotals(hydratedItems);
   const auth = getAuth();
 
+  if (!auth?.token || !auth?.user) {
+    showToast("Please login before checkout.");
+    window.location.href = "login.html?next=checkout.html";
+    return;
+  }
+
   if (auth?.user && form) {
     form.elements.name.value = auth.user.name || "";
     form.elements.email.value = auth.user.email || "";
@@ -1102,6 +1315,12 @@ async function initCheckoutPage() {
         return;
       }
     } catch (error) {
+      if (/login/i.test(error.message || "")) {
+        clearAuth();
+        window.location.href = "login.html?next=checkout.html";
+        return;
+      }
+
       messageEl.textContent = error.message || "Unable to place order.";
       placeOrderButton.disabled = false;
     }
@@ -1323,6 +1542,28 @@ function authHeaders() {
   return auth?.token ? { Authorization: `Bearer ${auth.token}` } : {};
 }
 
+function requireLoginToBuy(nextPage) {
+  const auth = getAuth();
+
+  if (auth?.token && auth?.user) {
+    return true;
+  }
+
+  showToast("Please login before buying.");
+  window.location.href = `login.html?next=${encodeURIComponent(nextPage || "checkout.html")}`;
+  return false;
+}
+
+function getSafeNextPage() {
+  const next = new URLSearchParams(window.location.search).get("next") || "";
+
+  if (/^[a-z0-9-]+\.html(?:[?#].*)?$/i.test(next)) {
+    return next;
+  }
+
+  return "";
+}
+
 function getOwnerToken() {
   return localStorage.getItem(OWNER_KEY) || "";
 }
@@ -1395,6 +1636,15 @@ function escapeAttribute(value) {
   return String(value || "").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function readImageFile(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -1426,6 +1676,18 @@ function formatCurrency(amount) {
     currency: "INR",
     maximumFractionDigits: 0
   }).format(amount);
+}
+
+function formatDate(value) {
+  if (!value) {
+    return "No date";
+  }
+
+  return new Date(value).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric"
+  });
 }
 
 let toastTimer;

@@ -17,11 +17,17 @@ services:
         value: JoyBox Gifts & Toys
       - key: STORE_EMAIL
         sync: false
+      - key: MONGO_URI
+        sync: false
+      - key: MONGO_DB_NAME
+        value: joybox_store
       - key: CONTACT_TO_EMAIL
         sync: false
       - key: AUTH_TOKEN_SECRET
         sync: false
-      - key: OWNER_PASSWORD
+      - key: ADMIN_ID
+        sync: false
+      - key: ADMIN_PASSWORD
         sync: false
       - key: OWNER_TOKEN_SECRET
         sync: false

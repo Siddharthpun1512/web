@@ -4,6 +4,16 @@ const path = require("path");
 const crypto = require("crypto");
 const https = require("https");
 const { signupUser, loginUser, getUserFromToken, updateUserProfile, changeUserPassword } = require("./authLogic");
+const {
+  connectDataStore,
+  readProducts,
+  writeProducts,
+  readOrders,
+  writeOrders,
+  addContactRequest,
+  readContactRequests,
+  readUsers
+} = require("./store");
 
 // Load backend/.env before reading configuration values from process.env.
 loadEnvFile(path.resolve(__dirname, "..", ".env"));
@@ -12,9 +22,6 @@ loadEnvFile(path.resolve(__dirname, "..", ".env"));
 const host = process.env.HOST || "0.0.0.0";
 const port = Number(process.env.PORT || 3000);
 const frontendDir = path.resolve(__dirname, "..", "..", "frontend");
-const productsPath = path.resolve(__dirname, "..", "data", "products.json");
-const ordersPath = path.resolve(__dirname, "..", "data", "orders.json");
-const contactRequestsPath = path.resolve(__dirname, "..", "data", "contact-requests.json");
 
 // Store and payment settings. Razorpay is enabled only when both keys exist.
 const storeName = process.env.STORE_NAME || "JoyBox Gifts & Toys";
@@ -22,7 +29,8 @@ const storeEmail = process.env.STORE_EMAIL || "siddharthpun1512@gamil.com.com";
 const razorpayKeyId = process.env.RAZORPAY_KEY_ID || "";
 const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET || "";
 const isRazorpayEnabled = Boolean(razorpayKeyId && razorpayKeySecret);
-const ownerPassword = process.env.OWNER_PASSWORD || "owner123";
+const adminId = process.env.ADMIN_ID || process.env.OWNER_ID || "admin";
+const adminPassword = process.env.ADMIN_PASSWORD || process.env.OWNER_PASSWORD || "admin123";
 const ownerTokenSecret = process.env.OWNER_TOKEN_SECRET || process.env.AUTH_TOKEN_SECRET || "change-owner-secret-in-backend-env";
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -84,23 +92,24 @@ const server = http.createServer(async (request, response) => {
 
   // Returns the product catalog from backend/data/products.json.
   if (request.method === "GET" && url.pathname === "/api/products") {
-    sendJson(response, 200, readJson(productsPath, []));
+    sendJson(response, 200, await readProducts());
     return;
   }
 
   if (request.method === "POST" && url.pathname === "/api/owner/login") {
     try {
       const payload = await readRequestBody(request);
+      const incomingAdminId = String(payload.adminId || payload.ownerId || "").trim();
       const password = String(payload.password || "");
 
-      if (!password || password !== ownerPassword) {
-        sendJson(response, 401, { error: "Invalid owner password." });
+      if (!incomingAdminId || incomingAdminId !== adminId || !password || password !== adminPassword) {
+        sendJson(response, 401, { error: "Invalid admin ID or password." });
         return;
       }
 
-      sendJson(response, 200, { token: signOwnerToken() });
+      sendJson(response, 200, { token: signOwnerToken(incomingAdminId), adminId: incomingAdminId });
     } catch (error) {
-      sendJson(response, 400, { error: error.message || "Unable to login owner." });
+      sendJson(response, 400, { error: error.message || "Unable to login admin." });
     }
     return;
   }
@@ -108,9 +117,61 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "GET" && url.pathname === "/api/owner/products") {
     try {
       requireOwner(request);
-      sendJson(response, 200, { products: readJson(productsPath, []) });
+      sendJson(response, 200, { products: await readProducts() });
     } catch (error) {
-      sendJson(response, 401, { error: error.message || "Owner login required." });
+      sendJson(response, 401, { error: error.message || "Admin login required." });
+    }
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/owner/orders") {
+    try {
+      requireOwner(request);
+      const orders = (await readOrders()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      sendJson(response, 200, { orders });
+    } catch (error) {
+      sendJson(response, 401, { error: error.message || "Admin login required." });
+    }
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/owner/users") {
+    try {
+      requireOwner(request);
+      const users = (await readUsers()).map(publicAdminUser);
+      sendJson(response, 200, { users });
+    } catch (error) {
+      sendJson(response, 401, { error: error.message || "Admin login required." });
+    }
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/owner/contacts") {
+    try {
+      requireOwner(request);
+      const contacts = (await readContactRequests()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      sendJson(response, 200, { contacts });
+    } catch (error) {
+      sendJson(response, 401, { error: error.message || "Admin login required." });
+    }
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/owner/export") {
+    try {
+      requireOwner(request);
+      const exportData = {
+        generatedAt: new Date().toISOString(),
+        products: await readProducts(),
+        orders: await readOrders(),
+        users: (await readUsers()).map(publicAdminUser),
+        contactRequests: await readContactRequests()
+      };
+
+      response.setHeader("Content-Disposition", `attachment; filename="joybox-data-${Date.now()}.json"`);
+      send(response, 200, mimeTypes[".json"], JSON.stringify(exportData, null, 2));
+    } catch (error) {
+      sendJson(response, 401, { error: error.message || "Admin login required." });
     }
     return;
   }
@@ -119,11 +180,11 @@ const server = http.createServer(async (request, response) => {
     try {
       requireOwner(request);
       const payload = await readRequestBody(request);
-      const products = readJson(productsPath, []);
+      const products = await readProducts();
       const product = normalizeProduct(payload, products);
 
       products.push(product);
-      writeJson(productsPath, products);
+      await writeProducts(products);
       sendJson(response, 201, { product, products });
     } catch (error) {
       sendJson(response, 400, { error: error.message || "Unable to add product." });
@@ -136,7 +197,7 @@ const server = http.createServer(async (request, response) => {
       requireOwner(request);
       const productId = decodeURIComponent(url.pathname.replace("/api/owner/products/", ""));
       const payload = await readRequestBody(request);
-      const products = readJson(productsPath, []);
+      const products = await readProducts();
       const productIndex = products.findIndex((product) => product.id === productId);
 
       if (productIndex === -1) {
@@ -146,7 +207,7 @@ const server = http.createServer(async (request, response) => {
 
       const product = normalizeProduct({ ...products[productIndex], ...payload, id: productId }, products, productId);
       products[productIndex] = product;
-      writeJson(productsPath, products);
+      await writeProducts(products);
       sendJson(response, 200, { product, products });
     } catch (error) {
       sendJson(response, 400, { error: error.message || "Unable to update product." });
@@ -158,7 +219,7 @@ const server = http.createServer(async (request, response) => {
     try {
       requireOwner(request);
       const productId = decodeURIComponent(url.pathname.replace("/api/owner/products/", ""));
-      const products = readJson(productsPath, []);
+      const products = await readProducts();
       const nextProducts = products.filter((product) => product.id !== productId);
 
       if (nextProducts.length === products.length) {
@@ -166,7 +227,7 @@ const server = http.createServer(async (request, response) => {
         return;
       }
 
-      writeJson(productsPath, nextProducts);
+      await writeProducts(nextProducts);
       sendJson(response, 200, { ok: true, products: nextProducts });
     } catch (error) {
       sendJson(response, 400, { error: error.message || "Unable to remove product." });
@@ -177,7 +238,7 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "POST" && url.pathname === "/api/auth/signup") {
     try {
       const payload = await readRequestBody(request);
-      sendJson(response, 201, signupUser(payload));
+      sendJson(response, 201, await signupUser(payload));
     } catch (error) {
       sendJson(response, 400, { error: error.message || "Unable to create account." });
     }
@@ -187,7 +248,7 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "POST" && url.pathname === "/api/auth/login") {
     try {
       const payload = await readRequestBody(request);
-      sendJson(response, 200, loginUser(payload));
+      sendJson(response, 200, await loginUser(payload));
     } catch (error) {
       sendJson(response, 401, { error: error.message || "Unable to login." });
     }
@@ -197,7 +258,7 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "GET" && url.pathname === "/api/auth/me") {
     try {
       const token = getBearerToken(request);
-      sendJson(response, 200, { user: getUserFromToken(token) });
+      sendJson(response, 200, { user: await getUserFromToken(token) });
     } catch (error) {
       sendJson(response, 401, { error: error.message || "Please login again." });
     }
@@ -208,7 +269,7 @@ const server = http.createServer(async (request, response) => {
     try {
       const token = getBearerToken(request);
       const payload = await readRequestBody(request);
-      sendJson(response, 200, { user: updateUserProfile(token, payload) });
+      sendJson(response, 200, { user: await updateUserProfile(token, payload) });
     } catch (error) {
       sendJson(response, 400, { error: error.message || "Unable to update profile." });
     }
@@ -219,7 +280,7 @@ const server = http.createServer(async (request, response) => {
     try {
       const token = getBearerToken(request);
       const payload = await readRequestBody(request);
-      sendJson(response, 200, changeUserPassword(token, payload));
+      sendJson(response, 200, await changeUserPassword(token, payload));
     } catch (error) {
       sendJson(response, 400, { error: error.message || "Unable to change password." });
     }
@@ -229,8 +290,8 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "GET" && url.pathname === "/api/profile/orders") {
     try {
       const token = getBearerToken(request);
-      const user = getUserFromToken(token);
-      const orders = readJson(ordersPath, [])
+      const user = await getUserFromToken(token);
+      const orders = (await readOrders())
         .filter((order) => order.userId === user.id || order.customer?.email === user.email)
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
@@ -259,8 +320,7 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
-    const entries = readJson(contactRequestsPath, []);
-    entries.push({
+    await addContactRequest({
       id: `MSG-${Date.now()}`,
       name,
       email,
@@ -268,7 +328,6 @@ const server = http.createServer(async (request, response) => {
       message,
       createdAt: new Date().toISOString()
     });
-    writeJson(contactRequestsPath, entries);
 
     sendJson(response, 201, { ok: true, message: "Your message has been saved." });
     return;
@@ -278,10 +337,12 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "POST" && url.pathname === "/api/orders") {
     try {
       const payload = await readRequestBody(request);
-      const result = await createOrder(payload, getOptionalUser(request));
+      const user = await requireCustomer(request);
+      const result = await createOrder(payload, user);
       sendJson(response, 201, result);
     } catch (error) {
-      sendJson(response, 400, { error: error.message || "Unable to create order." });
+      const status = error.message === "Please login before placing an order." ? 401 : 400;
+      sendJson(response, status, { error: error.message || "Unable to create order." });
     }
     return;
   }
@@ -290,7 +351,7 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "POST" && url.pathname === "/api/payments/verify") {
     try {
       const payload = await readRequestBody(request);
-      const result = verifyPayment(payload);
+      const result = await verifyPayment(payload);
       sendJson(response, 200, result);
     } catch (error) {
       sendJson(response, 400, { error: error.message || "Payment verification failed." });
@@ -302,14 +363,19 @@ const server = http.createServer(async (request, response) => {
   serveStaticAsset(url.pathname, response);
 });
 
-try {
-  assertProductionConfig();
-  server.listen(port, host, () => {
-    console.log(`JoyBox server running at http://${host}:${port}`);
-  });
-} catch (error) {
+startServer().catch((error) => {
   console.error(error.message);
   process.exit(1);
+});
+
+async function startServer() {
+  assertProductionConfig();
+  const connectedToMongo = await connectDataStore();
+
+  server.listen(port, host, () => {
+    console.log(`JoyBox server running at http://${host}:${port}`);
+    console.log(`Data store: ${connectedToMongo ? "MongoDB" : "JSON files"}`);
+  });
 }
 
 async function createOrder(payload, user = null) {
@@ -348,7 +414,7 @@ async function createOrder(payload, user = null) {
     throw new Error("Cart is empty.");
   }
 
-  const catalog = readJson(productsPath, []);
+  const catalog = await readProducts();
   const detailedItems = items.map((item) => {
     // Look up each cart item in the real product catalog so price cannot be faked by the browser.
     const product = catalog.find((entry) => entry.id === item.id);
@@ -373,7 +439,7 @@ async function createOrder(payload, user = null) {
   const total = subtotal + shipping;
   const orderId = `JOY-${Date.now()}`;
   const receipt = `receipt_${Date.now()}`;
-  const orders = readJson(ordersPath, []);
+  const orders = await readOrders();
 
   const baseOrder = {
     id: orderId,
@@ -391,7 +457,7 @@ async function createOrder(payload, user = null) {
   // COD orders are immediately confirmed because no online gateway step is needed.
   if (paymentMethod === "cod") {
     orders.push(baseOrder);
-    writeJson(ordersPath, orders);
+    await writeOrders(orders);
     return {
       ok: true,
       mode: "cod",
@@ -419,7 +485,7 @@ async function createOrder(payload, user = null) {
   };
 
   orders.push(orderWithGateway);
-  writeJson(ordersPath, orders);
+  await writeOrders(orders);
 
   return {
     ok: true,
@@ -440,7 +506,7 @@ async function createOrder(payload, user = null) {
   };
 }
 
-function verifyPayment(payload) {
+async function verifyPayment(payload) {
   // These values come back from Razorpay checkout after the user pays.
   const localOrderId = String(payload.localOrderId || "").trim();
   const razorpayOrderId = String(payload.razorpay_order_id || "").trim();
@@ -466,7 +532,7 @@ function verifyPayment(payload) {
     throw new Error("Invalid payment signature.");
   }
 
-  const orders = readJson(ordersPath, []);
+  const orders = await readOrders();
   const order = orders.find((entry) => entry.id === localOrderId);
 
   if (!order) {
@@ -484,7 +550,7 @@ function verifyPayment(payload) {
     signature: razorpaySignature
   };
 
-  writeJson(ordersPath, orders);
+  await writeOrders(orders);
 
   return {
     ok: true,
@@ -540,21 +606,6 @@ function resolveFrontendFile(relativePath) {
   }
 
   return resolvedPath;
-}
-
-function readJson(filePath, fallbackValue) {
-  // Read JSON from disk; if the file is missing or invalid, use the provided default.
-  try {
-    return JSON.parse(fs.readFileSync(filePath, "utf8"));
-  } catch (error) {
-    return fallbackValue;
-  }
-}
-
-function writeJson(filePath, value) {
-  // Ensure the data folder exists before saving formatted JSON.
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(value, null, 2));
 }
 
 function readRequestBody(request) {
@@ -676,8 +727,21 @@ function assertProductionConfig() {
     missing.push("AUTH_TOKEN_SECRET");
   }
 
-  if (!process.env.OWNER_PASSWORD || process.env.OWNER_PASSWORD === "owner123" || process.env.OWNER_PASSWORD === "change_this_owner_password") {
-    missing.push("OWNER_PASSWORD");
+  if (!process.env.MONGO_URI) {
+    missing.push("MONGO_URI");
+  }
+
+  if (!process.env.ADMIN_ID && !process.env.OWNER_ID) {
+    missing.push("ADMIN_ID");
+  }
+
+  if (
+    (!process.env.ADMIN_PASSWORD && !process.env.OWNER_PASSWORD) ||
+    adminPassword === "admin123" ||
+    adminPassword === "owner123" ||
+    adminPassword === "change_this_owner_password"
+  ) {
+    missing.push("ADMIN_PASSWORD");
   }
 
   if (!process.env.OWNER_TOKEN_SECRET || process.env.OWNER_TOKEN_SECRET === "change_this_owner_token_secret") {
@@ -774,14 +838,20 @@ function createProductId(name) {
     .slice(0, 64) || `product-${Date.now()}`;
 }
 
+function publicAdminUser(user) {
+  const { passwordHash, ...safeUser } = user || {};
+  return safeUser;
+}
+
 function getBearerToken(request) {
   const header = request.headers.authorization || "";
   return header.startsWith("Bearer ") ? header.slice(7) : "";
 }
 
-function signOwnerToken() {
+function signOwnerToken(adminIdValue) {
   const payload = {
     owner: true,
+    adminId: adminIdValue,
     exp: Date.now() + 12 * 60 * 60 * 1000
   };
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
@@ -809,7 +879,7 @@ function createOwnerSignature(value) {
   return crypto.createHmac("sha256", ownerTokenSecret).update(value).digest("base64url");
 }
 
-function getOptionalUser(request) {
+async function getOptionalUser(request) {
   const token = getBearerToken(request);
 
   if (!token) {
@@ -817,9 +887,23 @@ function getOptionalUser(request) {
   }
 
   try {
-    return getUserFromToken(token);
+    return await getUserFromToken(token);
   } catch (error) {
     return null;
+  }
+}
+
+async function requireCustomer(request) {
+  const token = getBearerToken(request);
+
+  if (!token) {
+    throw new Error("Please login before placing an order.");
+  }
+
+  try {
+    return await getUserFromToken(token);
+  } catch (error) {
+    throw new Error("Please login before placing an order.");
   }
 }
 
